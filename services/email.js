@@ -1,10 +1,10 @@
 const nodemailer = require('nodemailer');
 
-// ── Setup transporter ──
+// ── Secure transporter (port 465, SSL) ──
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false,
+    port: parseInt(process.env.EMAIL_PORT) || 465,
+    secure: true,   // SSL (use true for port 465)
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS
@@ -32,7 +32,7 @@ async function sendVerificationEmail(email, username, token) {
     return transporter.sendMail(mailOptions);
 }
 
-// ── Send password reset email (if you want) ──
+// ── Send password reset email ──
 async function sendPasswordResetEmail(email, token) {
     const resetLink = `${process.env.CLIENT_URL}/reset-password.html?token=${token}`;
     const mailOptions = {
