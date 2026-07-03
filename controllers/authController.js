@@ -2,8 +2,8 @@ const User = require('../models/User');
 const UserActivity = require('../models/UserActivity');
 const { hashPassword, comparePassword, signToken, verifyToken } = require('../config/auth');
 const { isValidEmail, isValidUsername, isValidPhone, isValidPassword } = require('../utils/validators');
+const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/email');
 
-// ── REGISTER ──
 exports.register = async (req, res) => {
     try {
         const { fullName, username, email, phone, password } = req.body;
@@ -28,14 +28,22 @@ exports.register = async (req, res) => {
         const userId = await User.create(fullName, username, email, phone, hashed);
         await UserActivity.log(userId, 'registered');
 
-        return res.status(201).json({ message: 'Account created successfully', userId });
+        // ── Send verification email ──
+        const verifyToken = signToken({ id: userId, purpose: 'verify' }, false, '24h');
+        const expires = new Date(Date.now() + 86400000);
+        await User.updateVerificationToken(userId, verifyToken, expires);
+        await sendVerificationEmail(email, username, verifyToken);
+
+        return res.status(201).json({
+            message: 'Account created. Please check your email to verify.',
+            userId
+        });
     } catch (err) {
         console.error('Register error:', err);
         return res.status(500).json({ error: 'Server error during registration' });
     }
 };
 
-// ── LOGIN ──
 exports.login = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -49,6 +57,9 @@ exports.login = async (req, res) => {
         }
         if (!user.is_active) {
             return res.status(403).json({ error: 'Account is disabled' });
+        }
+        if (!user.email_verified) {
+            return res.status(403).json({ error: 'Email not verified. Please check your inbox.' });
         }
 
         await User.updateLastLogin(user.id);
@@ -73,14 +84,12 @@ exports.login = async (req, res) => {
     }
 };
 
-// ── LOGOUT ──
 exports.logout = (req, res) => {
     res.clearCookie('token');
     res.clearCookie('adminToken');
     return res.json({ message: 'Logged out successfully' });
 };
 
-// ── ME ──
 exports.me = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -91,7 +100,6 @@ exports.me = async (req, res) => {
     }
 };
 
-// ── FORGOT PASSWORD ──
 exports.forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -108,12 +116,12 @@ exports.forgotPassword = async (req, res) => {
         const expires = new Date(Date.now() + 3600000);
         await User.updateResetToken(user.id, resetToken, expires);
 
-        const resetLink = `${process.env.CLIENT_URL}/reset-password.html?token=${resetToken}`;
-        console.log(`🔑 Reset link: ${resetLink}`);
+        // Instead of returning link, send email
+        await sendPasswordResetEmail(email, resetToken);
+        console.log(`🔑 Reset link: ${process.env.CLIENT_URL}/reset-password.html?token=${resetToken}`); // debug
 
         return res.json({
-            message: 'Password reset link has been sent to your email (check console).',
-            resetLink // remove this in production
+            message: 'Password reset link has been sent to your email.'
         });
     } catch (err) {
         console.error('Forgot password error:', err);
@@ -121,7 +129,6 @@ exports.forgotPassword = async (req, res) => {
     }
 };
 
-// ── RESET PASSWORD ──
 exports.resetPassword = async (req, res) => {
     try {
         const { token, newPassword } = req.body;
@@ -152,6 +159,21 @@ exports.resetPassword = async (req, res) => {
         return res.json({ message: 'Password reset successfully. Please login.' });
     } catch (err) {
         console.error('Reset password error:', err);
+        return res.status(500).json({ error: 'Server error' });
+    }
+};
+
+exports.verifyEmail = async (req, res) => {
+    try {
+        const { token } = req.query;
+        if (!token) return res.status(400).json({ error: 'Missing verification token' });
+        const affected = await User.verifyEmail(token);
+        if (affected === 0) {
+            return res.status(400).json({ error: 'Invalid or expired token' });
+        }
+        return res.json({ message: 'Email verified successfully. You can now login.' });
+    } catch (err) {
+        console.error('Verification error:', err);
         return res.status(500).json({ error: 'Server error' });
     }
 };
