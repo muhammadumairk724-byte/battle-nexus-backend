@@ -8,7 +8,7 @@ const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
 const leaderboardRoutes = require('./routes/leaderboard');
-const hallOfFameRoutes = require('./routes/halloffame');
+// const hallOfFameRoutes = require('./routes/halloffame'); // removed
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
 
@@ -46,7 +46,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-app.use('/api/hall-of-fame', hallOfFameRoutes);
+// app.use('/api/hall-of-fame', hallOfFameRoutes); // removed
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 
