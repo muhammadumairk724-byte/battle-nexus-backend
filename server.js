@@ -8,17 +8,15 @@ const authRoutes = require('./routes/auth');
 const tournamentRoutes = require('./routes/tournaments');
 const registrationRoutes = require('./routes/registrations');
 const leaderboardRoutes = require('./routes/leaderboard');
-// const hallOfFameRoutes = require('./routes/halloffame'); // removed
 const userRoutes = require('./routes/users');
 const adminRoutes = require('./routes/admin');
+const notificationRoutes = require('./routes/notifications'); // <-- added
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ── Trust proxy (for production) ──
 app.set('trust proxy', 1);
 
-// ── CORS ──
 const allowedOrigins = [
     'http://localhost:5500',
     'http://127.0.0.1:5500',
@@ -46,9 +44,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
-// app.use('/api/hall-of-fame', hallOfFameRoutes); // removed
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes); // <-- added
 
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Battle Nexus API running' });

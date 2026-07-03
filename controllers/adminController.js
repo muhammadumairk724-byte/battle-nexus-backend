@@ -3,6 +3,7 @@ const Tournament = require('../models/Tournament');
 const Registration = require('../models/Registration');
 const Leaderboard = require('../models/Leaderboard');
 const UserActivity = require('../models/UserActivity');
+const Notification = require('../models/Notification'); // <-- added
 const { sendWhatsApp, buildApprovalMessage, buildDisapprovalMessage } = require('../services/whatsapp');
 
 // ── Dashboard Stats ──
@@ -41,7 +42,6 @@ exports.updateTournament = async (req, res) => {
     try {
         const { name, game, type, map, prizePool, entryFee, maxSlots, dateTime, description, status } = req.body;
         console.log('📥 Update tournament payload:', req.body);
-        
         const updateData = {
             name: name || 'Untitled Tournament',
             game: game || 'Free Fire',
@@ -54,7 +54,6 @@ exports.updateTournament = async (req, res) => {
             description: description || null,
             status: status || 'upcoming'
         };
-
         await Tournament.update(req.params.id, updateData);
         return res.json({ message: 'Tournament updated successfully' });
     } catch (err) {
@@ -101,6 +100,11 @@ exports.approveRegistration = async (req, res) => {
         await Tournament.incrementFilledSlots(reg.tournament_id);
         await UserActivity.log(reg.user_id, `registration #${regId} approved for ${reg.tournament_name}`);
 
+        // ── Create notification for user ──
+        const notifMessage = `🎉 Your registration for "${reg.tournament_name}" has been APPROVED!`;
+        await Notification.create(reg.user_id, reg.tournament_id, notifMessage, 'approved');
+
+        // WhatsApp notification (best effort)
         try {
             const message = buildApprovalMessage(reg.tournament_name, reg.team_name || reg.username, reg.date_time);
             await sendWhatsApp(reg.whatsapp_number, message);
@@ -128,6 +132,11 @@ exports.disapproveRegistration = async (req, res) => {
         await Registration.updateStatus(regId, 'disapproved');
         await UserActivity.log(reg.user_id, `registration #${regId} disapproved for ${reg.tournament_name}`);
 
+        // ── Create notification for user ──
+        const notifMessage = `❌ Your registration for "${reg.tournament_name}" has been DECLINED.`;
+        await Notification.create(reg.user_id, reg.tournament_id, notifMessage, 'rejected');
+
+        // WhatsApp notification (best effort)
         try {
             const message = buildDisapprovalMessage(reg.tournament_name, reason);
             await sendWhatsApp(reg.whatsapp_number, message);
@@ -157,14 +166,11 @@ exports.upsertLeaderboard = async (req, res) => {
     try {
         console.log('📥 Incoming leaderboard payload:', req.body);
         const { userId, tournamentId, rank, score, kills, booyahs } = req.body;
-
         if (!userId || !tournamentId) {
             return res.status(400).json({ error: 'User and tournament required' });
         }
-
         await Leaderboard.upsert({ userId, tournamentId, rank, score, kills, booyahs });
         console.log('✅ Leaderboard entry saved successfully');
-
         return res.json({ message: 'Leaderboard entry saved' });
     } catch (err) {
         console.error('❌ Leaderboard upsert error:', err);
